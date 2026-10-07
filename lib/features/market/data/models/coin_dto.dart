@@ -4,12 +4,11 @@ import 'package:ticker/features/market/domain/entities/coin.dart';
 ///
 /// Field names mirror the API; [toEntity] maps them to the domain's [Coin].
 final class CoinDto {
-
   final String symbol;
   final double lastPrice;
   final double priceChangePercent;
   final double volume;
-  
+
   const CoinDto({
     required this.symbol,
     required this.lastPrice,

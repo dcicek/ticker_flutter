@@ -20,7 +20,7 @@ void main() {
   });
 
   group('MarketRepositoryImpl.getCoins', () {
-    test("data source DTO dönerse Success içinde Coin listesi verir", () async {
+    test('data source DTO dönerse Success içinde Coin listesi verir', () async {
       // 1. Hazırla
       when(() => remote.getTickers()).thenAnswer(
         (_) async => const [
@@ -68,6 +68,45 @@ void main() {
       expect(
         (result as Failure<List<Coin>>).failure,
         isA<NetworkFailure>(),
+      );
+    });
+
+    test('sunucu hata kodu dönerse ServerFailure verir', () async {
+      // 1. Hazırla: cevabı (response) olan bir DioException
+      when(() => remote.getTickers()).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(),
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(),
+            statusCode: 500,
+          ),
+        ),
+      );
+
+      // 2. Çalıştır
+      final result = await repository.getCoins();
+
+      // 3. Doğrula
+      expect(result, isA<Failure<List<Coin>>>());
+      final failure = (result as Failure<List<Coin>>).failure;
+      expect(failure, isA<ServerFailure>());
+      expect((failure as ServerFailure).statusCode, 500);
+    });
+
+    test('cevap parse edilemezse UnknownFailure verir', () async {
+      // 1. Hazırla
+      when(
+        () => remote.getTickers(),
+      ).thenThrow(const FormatException('bozuk veri'));
+
+      // 2. Çalıştır
+      final result = await repository.getCoins();
+
+      // 3. Doğrula
+      expect(result, isA<Failure<List<Coin>>>());
+      expect(
+        (result as Failure<List<Coin>>).failure,
+        isA<UnknownFailure>(),
       );
     });
   });
