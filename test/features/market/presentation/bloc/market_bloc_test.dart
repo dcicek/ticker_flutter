@@ -59,5 +59,30 @@ void main() {
         MarketState(status: MarketStatus.error, failure: NetworkFailure()),
       ],
     );
+
+    blocTest<MarketBloc, MarketState>(
+      'yalnızca USDT paritelerini işlem tutarına göre sıralı verir',
+      setUp: () {
+        when(() => repository.getCoins()).thenAnswer(
+          (_) async => const Success([
+            // tutar: 2 x 10 = 20
+            Coin(symbol: 'AUSDT', price: 2, changePercent: 0, volume: 10),
+            // USDT paritesi değil, elenmeli
+            Coin(symbol: 'ETHBTC', price: 1, changePercent: 0, volume: 999),
+            // tutar: 5 x 100 = 500
+            Coin(symbol: 'BUSDT', price: 5, changePercent: 0, volume: 100),
+          ]),
+        );
+      },
+      build: () => MarketBloc(repository),
+      act: (bloc) => bloc.add(const MarketStarted()),
+      skip: 1, // loading state'ini atla
+      verify: (bloc) {
+        expect(bloc.state.coins.map((coin) => coin.symbol), [
+          'BUSDT',
+          'AUSDT',
+        ]);
+      },
+    );
   });
 }
