@@ -25,6 +25,20 @@ final class CoinDto {
     );
   }
 
+  // WebSocket `!miniTicker@arr` elemanı: s=symbol, c=son fiyat, o=24 saat
+  // önceki fiyat, v=hacim. Yüzde değişim gelmediği için burada hesaplanıyor.
+  factory CoinDto.fromMiniTicker(Map<String, dynamic> json) {
+    final close = double.parse(json['c'] as String);
+    final open = double.parse(json['o'] as String);
+
+    return CoinDto(
+      symbol: json['s'] as String,
+      lastPrice: close,
+      priceChangePercent: open == 0 ? 0 : (close - open) / open * 100,
+      volume: double.parse(json['v'] as String),
+    );
+  }
+
   Coin toEntity() {
     return Coin(
       symbol: symbol,

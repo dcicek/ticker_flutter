@@ -7,6 +7,7 @@ import 'package:ticker/core/error/result.dart';
 import 'package:ticker/features/market/domain/entities/coin.dart';
 import 'package:ticker/features/market/presentation/bloc/market_bloc.dart';
 import 'package:ticker/features/market/presentation/pages/market_page.dart';
+import 'package:ticker/features/market/presentation/widgets/coin_tile.dart';
 
 // Sahte bloc: gerçek bloc'u ve repository'yi çalıştırmadan ekrana istediğimiz
 // state'i veriyoruz.
@@ -79,6 +80,71 @@ void main() {
       await tester.tap(find.text('Tekrar dene'));
 
       verify(() => bloc.add(const MarketStarted())).called(1);
+    });
+
+    testWidgets('canlı güncelleme gelince yalnızca değişen fiyat ve yüzde '
+        'yeniden kurulur', (tester) async {
+      const btc = Coin(
+        symbol: 'BTCUSDT',
+        price: 100,
+        changePercent: 1,
+        volume: 1,
+      );
+      const eth = Coin(
+        symbol: 'ETHUSDT',
+        price: 10,
+        changePercent: 2,
+        volume: 1,
+      );
+      const ethUpdated = Coin(
+        symbol: 'ETHUSDT',
+        price: 12,
+        changePercent: 20,
+        volume: 1,
+      );
+      const before = MarketState(
+        status: MarketStatus.loaded,
+        coins: [btc, eth],
+      );
+      const after = MarketState(
+        status: MarketStatus.loaded,
+        coins: [btc, ethUpdated],
+      );
+
+      // whenListen: sahte bloc'a "önce before state'indesin, sonra after
+      // yayınla" diyoruz; soketten güncelleme gelmesinin taklidi.
+      whenListen(bloc, Stream.value(after), initialState: before);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BlocProvider<MarketBloc>.value(
+            value: bloc,
+            child: const MarketPage(),
+          ),
+        ),
+      );
+
+      // İlk çizimdeki widget nesnelerini sakla. Bir widget yeniden build
+      // edilmediyse sonradan bulduğumuz nesne bunlarla birebir aynıdır.
+      final tilesBefore = tester.widgetList(find.byType(CoinTile)).toList();
+      final pricesBefore = tester.widgetList(find.byType(CoinPrice)).toList();
+
+      await tester.pump(); // after state'i işlensin
+
+      final tilesAfter = tester.widgetList(find.byType(CoinTile)).toList();
+      final pricesAfter = tester.widgetList(find.byType(CoinPrice)).toList();
+
+      // ETH'nin yeni fiyatı ekranda
+      expect(find.text('12.00'), findsOneWidget);
+      expect(find.text('10.00'), findsNothing);
+      expect(find.text('+20.00%'), findsOneWidget);
+
+      // Avatar ve ad kısmı iki satırda da yeniden kurulmadı
+      expect(identical(tilesAfter[0], tilesBefore[0]), isTrue);
+      expect(identical(tilesAfter[1], tilesBefore[1]), isTrue);
+
+      // BTC'nin fiyatı yeniden kurulmadı, ETH'ninki kuruldu
+      expect(identical(pricesAfter[0], pricesBefore[0]), isTrue);
+      expect(identical(pricesAfter[1], pricesBefore[1]), isFalse);
     });
   });
 }

@@ -3,4 +3,6 @@ import 'package:ticker/features/market/domain/entities/coin.dart';
 
 abstract interface class MarketRepository {
   Future<Result<List<Coin>>> getCoins();
+
+  Stream<Result<List<Coin>>> watchCoins();
 }

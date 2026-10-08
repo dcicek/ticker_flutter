@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:ticker/core/error/result.dart';
 import 'package:ticker/features/market/data/datasources/market_remote_data_source.dart';
+import 'package:ticker/features/market/data/datasources/market_socket_data_source.dart';
 import 'package:ticker/features/market/data/models/coin_dto.dart';
 import 'package:ticker/features/market/data/repositories/market_repository_impl.dart';
 import 'package:ticker/features/market/domain/entities/coin.dart';
@@ -10,13 +11,17 @@ import 'package:ticker/features/market/domain/entities/coin.dart';
 // Bu kez sahtesini yaptığımız şey Dio değil, data source.
 class _MockRemoteDataSource extends Mock implements MarketRemoteDataSource {}
 
+class _MockSocketDataSource extends Mock implements MarketSocketDataSource {}
+
 void main() {
   late _MockRemoteDataSource remote;
+  late _MockSocketDataSource socket;
   late MarketRepositoryImpl repository;
 
   setUp(() {
     remote = _MockRemoteDataSource();
-    repository = MarketRepositoryImpl(remote);
+    socket = _MockSocketDataSource();
+    repository = MarketRepositoryImpl(remote, socket);
   });
 
   group('MarketRepositoryImpl.getCoins', () {
@@ -107,6 +112,55 @@ void main() {
       expect(
         (result as Failure<List<Coin>>).failure,
         isA<UnknownFailure>(),
+      );
+    });
+  });
+
+  group('MarketRepositoryImpl.watchCoins', () {
+    const dto = CoinDto(
+      symbol: 'BTCUSDT',
+      lastPrice: 110,
+      priceChangePercent: 10,
+      volume: 5,
+    );
+    const coin = Coin(
+      symbol: 'BTCUSDT',
+      price: 110,
+      changePercent: 10,
+      volume: 5,
+    );
+
+    test('soketten gelen her listeyi Success içinde Coin olarak yayınlar', () {
+      // Stream.value: tek bir değer yayınlayıp kapanan hazır bir stream.
+      when(() => socket.watchTickers()).thenAnswer(
+        (_) => Stream.value(const [dto]),
+      );
+
+      expect(
+        repository.watchCoins(),
+        emitsInOrder([
+          isA<Success<List<Coin>>>().having((s) => s.value, 'value', [coin]),
+          emitsDone,
+        ]),
+      );
+    });
+
+    test('soket hata verirse Failure yayınlar ve stream biter', () {
+      // Stream.error: hata fırlatan bir stream, kopan bağlantının taklidi.
+      when(() => socket.watchTickers()).thenAnswer(
+        (_) => Stream.error(Exception('bağlantı koptu')),
+      );
+
+      expect(
+        repository.watchCoins(),
+        emitsInOrder([
+          isA<Failure<List<Coin>>>().having(
+            (f) => f.failure,
+            'failure',
+            isA<NetworkFailure>(),
+          ),
+          emitsDone,
+        ]),
       );
     });
   });

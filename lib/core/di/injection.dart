@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
 import 'package:ticker/features/market/data/datasources/market_remote_data_source.dart';
+import 'package:ticker/features/market/data/datasources/market_socket_data_source.dart';
 import 'package:ticker/features/market/data/repositories/market_repository_impl.dart';
 import 'package:ticker/features/market/domain/repositories/market_repository.dart';
 import 'package:ticker/features/market/presentation/bloc/market_bloc.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 final GetIt getIt = GetIt.instance;
 
@@ -22,8 +24,11 @@ void configureDependencies() {
       ),
     )
     ..registerLazySingleton(() => MarketRemoteDataSource(getIt()))
+    ..registerLazySingleton(
+      () => MarketSocketDataSource(WebSocketChannel.connect),
+    )
     ..registerLazySingleton<MarketRepository>(
-      () => MarketRepositoryImpl(getIt()),
+      () => MarketRepositoryImpl(getIt(), getIt()),
     )
     // Bloc her ekran için yeniden oluşturulur, o yüzden factory.
     ..registerFactory(() => MarketBloc(getIt()));

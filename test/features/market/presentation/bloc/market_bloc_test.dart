@@ -17,6 +17,11 @@ void main() {
 
   setUp(() {
     repository = _MockMarketRepository();
+    // Varsayılan: canlı akış hiçbir şey göndermeden kapanır. Canlı fiyatı
+    // test eden testler bunu kendi stream'iyle ezer.
+    when(
+      () => repository.watchCoins(),
+    ).thenAnswer((_) => const Stream.empty());
   });
 
   group('MarketBloc', () {
@@ -82,6 +87,88 @@ void main() {
           'BUSDT',
           'AUSDT',
         ]);
+      },
+    );
+  });
+
+  group('MarketBloc canlı fiyat', () {
+    const initial = [
+      // tutar: 100 x 10 = 1000, listede ilk sırada
+      Coin(symbol: 'BTCUSDT', price: 100, changePercent: 1, volume: 10),
+      // tutar: 10 x 10 = 100
+      Coin(symbol: 'ETHUSDT', price: 10, changePercent: 2, volume: 10),
+    ];
+    const ethUpdate = Coin(
+      symbol: 'ETHUSDT',
+      price: 12,
+      changePercent: 20,
+      volume: 10,
+    );
+
+    setUp(() {
+      when(
+        () => repository.getCoins(),
+      ).thenAnswer((_) async => const Success(initial));
+    });
+
+    blocTest<MarketBloc, MarketState>(
+      'güncelleme gelen coin değişir, diğerleri ve sıra aynı kalır',
+      setUp: () {
+        when(() => repository.watchCoins()).thenAnswer(
+          (_) => Stream.value(
+            const Success([
+              ethUpdate,
+              // Listede olmayan parite yok sayılmalı
+              Coin(symbol: 'XRPBTC', price: 1, changePercent: 0, volume: 1),
+            ]),
+          ),
+        );
+      },
+      build: () => MarketBloc(repository),
+      act: (bloc) => bloc.add(const MarketStarted()),
+      expect: () => const [
+        MarketState(status: MarketStatus.loading),
+        MarketState(status: MarketStatus.loaded, coins: initial),
+        MarketState(
+          status: MarketStatus.loaded,
+          coins: [
+            Coin(symbol: 'BTCUSDT', price: 100, changePercent: 1, volume: 10),
+            ethUpdate,
+          ],
+        ),
+      ],
+    );
+
+    blocTest<MarketBloc, MarketState>(
+      'canlı akış hata verirse liste korunur, status error olur',
+      setUp: () {
+        when(() => repository.watchCoins()).thenAnswer(
+          (_) => Stream.value(const Failure(NetworkFailure())),
+        );
+      },
+      build: () => MarketBloc(repository),
+      act: (bloc) => bloc.add(const MarketStarted()),
+      skip: 2, // loading ve ilk loaded
+      expect: () => const [
+        MarketState(
+          status: MarketStatus.error,
+          coins: initial,
+          failure: NetworkFailure(),
+        ),
+      ],
+    );
+
+    blocTest<MarketBloc, MarketState>(
+      'ilk yükleme başarısızsa canlı akışa hiç bağlanmaz',
+      setUp: () {
+        when(
+          () => repository.getCoins(),
+        ).thenAnswer((_) async => const Failure(NetworkFailure()));
+      },
+      build: () => MarketBloc(repository),
+      act: (bloc) => bloc.add(const MarketStarted()),
+      verify: (_) {
+        verifyNever(() => repository.watchCoins());
       },
     );
   });

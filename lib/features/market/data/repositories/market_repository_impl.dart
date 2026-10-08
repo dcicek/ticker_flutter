@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:ticker/core/error/result.dart';
 import 'package:ticker/features/market/data/datasources/market_remote_data_source.dart';
+import 'package:ticker/features/market/data/datasources/market_socket_data_source.dart';
 import 'package:ticker/features/market/domain/entities/coin.dart';
 import 'package:ticker/features/market/domain/repositories/market_repository.dart';
 
@@ -9,10 +10,10 @@ import 'package:ticker/features/market/domain/repositories/market_repository.dar
 /// This is where exceptions stop: whatever the data source throws is turned
 /// into a [Failure], so callers only ever deal with a [Result].
 class MarketRepositoryImpl implements MarketRepository {
-  /// Creates a repository that reads from [_remote].
-  MarketRepositoryImpl(this._remote);
-
   final MarketRemoteDataSource _remote;
+  final MarketSocketDataSource _socket;
+
+  MarketRepositoryImpl(this._remote, this._socket);
 
   @override
   Future<Result<List<Coin>>> getCoins() async {
@@ -33,6 +34,17 @@ class MarketRepositoryImpl implements MarketRepository {
       // Parsing problems: FormatException from double.parse, TypeError from
       // a bad cast.
       return Failure(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Stream<Result<List<Coin>>> watchCoins() async* {
+    try {
+      await for (final tickers in _socket.watchTickers()) {
+        yield Success(tickers.map((dto) => dto.toEntity()).toList());
+      }
+    } on Object catch (e) {
+      yield Failure(NetworkFailure(e.toString()));
     }
   }
 }

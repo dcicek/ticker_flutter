@@ -33,5 +33,36 @@ void main() {
         ),
       );
     });
+
+    test('fromMiniTicker yüzde değişimi açılış ve son fiyattan hesaplar', () {
+      const miniTicker = <String, dynamic>{
+        's': 'BTCUSDT',
+        'c': '110.00',
+        'o': '100.00',
+        'v': '5',
+      };
+
+      final dto = CoinDto.fromMiniTicker(miniTicker);
+
+      expect(dto.symbol, 'BTCUSDT');
+      expect(dto.lastPrice, 110);
+      expect(dto.volume, 5);
+      // (110 - 100) / 100 * 100 = 10. Bölme sonucu küsuratlı çıkabildiği için
+      // tam eşitlik yerine "10'a çok yakın mı" diye bakıyoruz.
+      expect(dto.priceChangePercent, closeTo(10, 0.0001));
+    });
+
+    test('fromMiniTicker açılış fiyatı 0 ise yüzdeyi 0 verir', () {
+      const miniTicker = <String, dynamic>{
+        's': 'NEWUSDT',
+        'c': '1.50',
+        'o': '0',
+        'v': '0',
+      };
+
+      final dto = CoinDto.fromMiniTicker(miniTicker);
+
+      expect(dto.priceChangePercent, 0);
+    });
   });
 }

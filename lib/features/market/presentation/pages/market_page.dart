@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ticker/core/error/result.dart';
+import 'package:ticker/features/market/domain/entities/coin.dart';
 import 'package:ticker/features/market/presentation/bloc/market_bloc.dart';
 import 'package:ticker/features/market/presentation/widgets/coin_tile.dart';
 
@@ -23,6 +24,11 @@ class MarketPage extends StatelessWidget {
               SnackBar(content: Text(_failureMessage(state.failure))),
             );
         },
+        // Fiyat güncellemeleri liste iskeletini yeniden kurmasın; fiyatı her
+        // satır kendi BlocSelector'ı ile dinliyor.
+        buildWhen: (previous, current) =>
+            previous.status != current.status ||
+            previous.coins.length != current.coins.length,
         builder: (context, state) {
           if (state.coins.isEmpty) {
             return switch (state.status) {
@@ -49,15 +55,47 @@ class MarketPage extends StatelessWidget {
                 (s) => s.status != MarketStatus.loading,
               );
             },
-            child: ListView.separated(
+            child: ListView.builder(
               itemCount: state.coins.length,
-              separatorBuilder: (_, _) => const Divider(height: 1, indent: 66),
-              itemBuilder: (context, index) =>
-                  CoinTile(coin: state.coins[index]),
+              itemExtent: CoinTile.height,
+              itemBuilder: (context, index) => _CoinRow(index: index),
             ),
           );
         },
       ),
+    );
+  }
+}
+
+class _CoinRow extends StatelessWidget {
+  final int index;
+
+  const _CoinRow({required this.index});
+
+  Coin? _coin(MarketState state) =>
+      index < state.coins.length ? state.coins[index] : null;
+
+  @override
+  Widget build(BuildContext context) {
+    // Üç ayrı seçici: ad yalnızca sembol, fiyat yalnızca fiyat, değişim
+    // yalnızca yüzde değişince yeniden kurulur.
+    return BlocSelector<MarketBloc, MarketState, String?>(
+      selector: (state) => _coin(state)?.symbol,
+      builder: (context, symbol) {
+        if (symbol == null) return const SizedBox.shrink();
+
+        return CoinTile(
+          symbol: symbol,
+          price: BlocSelector<MarketBloc, MarketState, double>(
+            selector: (state) => _coin(state)?.price ?? 0,
+            builder: (context, price) => CoinPrice(price: price),
+          ),
+          change: BlocSelector<MarketBloc, MarketState, double>(
+            selector: (state) => _coin(state)?.changePercent ?? 0,
+            builder: (context, change) => CoinChange(changePercent: change),
+          ),
+        );
+      },
     );
   }
 }
@@ -101,8 +139,6 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-// Sealed class sayesinde yeni bir AppFailure eklenirse bu switch derlenmez;
-// kullanıcıya gösterilecek metni yazmayı unutamazsın.
 String _failureMessage(AppFailure? failure) {
   return switch (failure) {
     NetworkFailure() => 'İnternet bağlantısı kurulamadı.',
