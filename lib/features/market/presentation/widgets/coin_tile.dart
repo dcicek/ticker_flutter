@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-
-const _upColor = Color(0xFF16C784);
-const _downColor = Color(0xFFEA3943);
+import 'package:ticker/core/presentation/app_colors.dart';
+import 'package:ticker/core/utils/price_format.dart';
 
 // Satırın değişmeyen kısmı: avatar ve coin adı. Fiyat ve değişim dışarıdan
 // widget olarak verilir, böylece onlar yenilenirken burası yeniden kurulmaz.
@@ -115,7 +114,7 @@ class CoinChange extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUp = changePercent >= 0;
-    final color = isUp ? _upColor : _downColor;
+    final color = isUp ? upColor : downColor;
 
     return Container(
       width: 78,
@@ -135,16 +134,4 @@ class CoinChange extends StatelessWidget {
       ),
     );
   }
-}
-
-// 67000.1 -> 67,000.10; 1'in altındaki fiyatlarda 6 basamak (0.000012 gibi).
-String formatPrice(double price) {
-  if (price < 1) return price.toStringAsFixed(6);
-
-  final parts = price.toStringAsFixed(2).split('.');
-  final whole = parts[0].replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (_) => ',',
-  );
-  return '$whole.${parts[1]}';
 }

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:ticker/core/di/injection.dart';
-import 'package:ticker/features/market/presentation/bloc/market_bloc.dart';
-import 'package:ticker/features/market/presentation/pages/market_page.dart';
+import 'package:ticker/core/router/app_router.dart';
 
 void main() {
   configureDependencies();
@@ -14,7 +12,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Ticker',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -25,10 +23,7 @@ class MyApp extends StatelessWidget {
         ),
         dividerTheme: const DividerThemeData(color: Color(0xFF1E2329)),
       ),
-      home: BlocProvider(
-        create: (_) => getIt<MarketBloc>()..add(const MarketStarted()),
-        child: const MarketPage(),
-      ),
+      routerConfig: appRouter,
     );
   }
 }

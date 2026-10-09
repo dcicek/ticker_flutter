@@ -1,5 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
+import 'package:ticker/features/chart/data/datasources/chart_remote_data_source.dart';
+import 'package:ticker/features/chart/data/repositories/chart_repository_impl.dart';
+import 'package:ticker/features/chart/domain/repositories/chart_repository.dart';
+import 'package:ticker/features/chart/presentation/bloc/chart_bloc.dart';
 import 'package:ticker/features/market/data/datasources/market_remote_data_source.dart';
 import 'package:ticker/features/market/data/datasources/market_socket_data_source.dart';
 import 'package:ticker/features/market/data/repositories/market_repository_impl.dart';
@@ -31,5 +35,10 @@ void configureDependencies() {
       () => MarketRepositoryImpl(getIt(), getIt()),
     )
     // Bloc her ekran için yeniden oluşturulur, o yüzden factory.
-    ..registerFactory(() => MarketBloc(getIt()));
+    ..registerFactory(() => MarketBloc(getIt()))
+    ..registerLazySingleton(() => ChartRemoteDataSource(getIt()))
+    ..registerLazySingleton<ChartRepository>(
+      () => ChartRepositoryImpl(getIt()),
+    )
+    ..registerFactory(() => ChartBloc(getIt()));
 }
