@@ -21,7 +21,12 @@ void main() {
   setUp(() {
     remote = _MockRemoteDataSource();
     socket = _MockSocketDataSource();
-    repository = MarketRepositoryImpl(remote, socket);
+    // Testler yeniden bağlanmayı beklerken gerçekten saniyelerce durmasın.
+    repository = MarketRepositoryImpl(
+      remote,
+      socket,
+      retryDelay: (_) => Duration.zero,
+    );
   });
 
   group('MarketRepositoryImpl.getCoins', () {
@@ -130,38 +135,79 @@ void main() {
       volume: 5,
     );
 
+    Matcher isSuccessWith(List<Coin> coins) =>
+        isA<Success<List<Coin>>>().having((s) => s.value, 'value', coins);
+    final isNetworkFailure = isA<Failure<List<Coin>>>().having(
+      (f) => f.failure,
+      'failure',
+      isA<NetworkFailure>(),
+    );
+
     test('soketten gelen her listeyi Success içinde Coin olarak yayınlar', () {
       // Stream.value: tek bir değer yayınlayıp kapanan hazır bir stream.
       when(() => socket.watchTickers()).thenAnswer(
         (_) => Stream.value(const [dto]),
       );
 
+      expect(repository.watchCoins(), emits(isSuccessWith([coin])));
+    });
+
+    test('soket hata verirse Failure yayınlar, sonra yeniden bağlanır', () {
+      // İlk bağlantı kopuyor, ikincisi veri gönderiyor.
+      var calls = 0;
+      when(() => socket.watchTickers()).thenAnswer((_) {
+        calls++;
+        return calls == 1
+            ? Stream.error(Exception('bağlantı koptu'))
+            : Stream.value(const [dto]);
+      });
+
       expect(
         repository.watchCoins(),
         emitsInOrder([
-          isA<Success<List<Coin>>>().having((s) => s.value, 'value', [coin]),
-          emitsDone,
+          isNetworkFailure,
+          isSuccessWith([coin]),
         ]),
       );
     });
 
-    test('soket hata verirse Failure yayınlar ve stream biter', () {
-      // Stream.error: hata fırlatan bir stream, kopan bağlantının taklidi.
+    test('sunucu bağlantıyı hatasız kapatırsa da yeniden bağlanır', () async {
       when(() => socket.watchTickers()).thenAnswer(
-        (_) => Stream.error(Exception('bağlantı koptu')),
+        (_) => Stream.value(const [dto]),
       );
 
-      expect(
-        repository.watchCoins(),
-        emitsInOrder([
-          isA<Failure<List<Coin>>>().having(
-            (f) => f.failure,
-            'failure',
-            isA<NetworkFailure>(),
-          ),
-          emitsDone,
-        ]),
-      );
+      // İki değer alabilmek için iki ayrı bağlantı gerekir.
+      await repository.watchCoins().take(2).toList();
+
+      verify(() => socket.watchTickers()).called(2);
     });
+
+    test(
+      'art arda hatalarda bekleme artar, başarıdan sonra sıfırlanır',
+      () async {
+        final attempts = <int>[];
+        repository = MarketRepositoryImpl(
+          remote,
+          socket,
+          retryDelay: (attempt) {
+            attempts.add(attempt);
+            return Duration.zero;
+          },
+        );
+
+        // hata, hata, başarı, hata
+        var calls = 0;
+        when(() => socket.watchTickers()).thenAnswer((_) {
+          calls++;
+          return calls == 3
+              ? Stream.value(const [dto])
+              : Stream.error(Exception('bağlantı koptu'));
+        });
+
+        await repository.watchCoins().take(4).toList();
+
+        expect(attempts, [0, 1, 0]);
+      },
+    );
   });
 }

@@ -11,12 +11,17 @@ class MarketPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Piyasa')),
+      appBar: AppBar(
+        title: const Text('Piyasa'),
+        actions: const [_LiveIndicator(), SizedBox(width: 16)],
+      ),
       body: BlocConsumer<MarketBloc, MarketState>(
         // Liste ekrandayken yenileme başarısız olursa listeyi silmek yerine
         // altta kısa bir uyarı göster.
         listenWhen: (previous, current) =>
-            current.status == MarketStatus.error && current.coins.isNotEmpty,
+            previous.status != MarketStatus.error &&
+            current.status == MarketStatus.error &&
+            current.coins.isNotEmpty,
         listener: (context, state) {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
@@ -63,6 +68,32 @@ class MarketPage extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _LiveIndicator extends StatelessWidget {
+  const _LiveIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<MarketBloc, MarketState, bool>(
+      selector: (state) => state.isLive,
+      builder: (context, isLive) {
+        return Tooltip(
+          message: isLive ? 'Canlı' : 'Bağlantı yok',
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isLive
+                  ? const Color(0xFF16C784)
+                  : Theme.of(context).colorScheme.outline,
+            ),
+          ),
+        );
+      },
     );
   }
 }

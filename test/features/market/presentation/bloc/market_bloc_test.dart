@@ -135,6 +135,7 @@ void main() {
             Coin(symbol: 'BTCUSDT', price: 100, changePercent: 1, volume: 10),
             ethUpdate,
           ],
+          isLive: true,
         ),
       ],
     );
@@ -155,6 +156,34 @@ void main() {
           coins: initial,
           failure: NetworkFailure(),
         ),
+      ],
+    );
+
+    blocTest<MarketBloc, MarketState>(
+      'bağlantı kopup geri gelince isLive önce false, sonra true olur',
+      setUp: () {
+        when(() => repository.watchCoins()).thenAnswer(
+          (_) => Stream.fromIterable(const [
+            Success([ethUpdate]),
+            Failure(NetworkFailure()),
+            Success([ethUpdate]),
+          ]),
+        );
+      },
+      build: () => MarketBloc(repository),
+      act: (bloc) => bloc.add(const MarketStarted()),
+      skip: 2, // loading ve ilk loaded
+      verify: (bloc) {
+        expect(bloc.state.isLive, isTrue);
+        expect(bloc.state.status, MarketStatus.loaded);
+        expect(bloc.state.failure, isNull);
+      },
+      expect: () => [
+        isA<MarketState>().having((s) => s.isLive, 'isLive', isTrue),
+        isA<MarketState>()
+            .having((s) => s.isLive, 'isLive', isFalse)
+            .having((s) => s.status, 'status', MarketStatus.error),
+        isA<MarketState>().having((s) => s.isLive, 'isLive', isTrue),
       ],
     );
 

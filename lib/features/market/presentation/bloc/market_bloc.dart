@@ -21,7 +21,7 @@ class MarketBloc extends Bloc<MarketEvent, MarketState> {
     MarketStarted event,
     Emitter<MarketState> emit,
   ) async {
-    emit(state.copyWith(status: MarketStatus.loading));
+    emit(state.copyWith(status: MarketStatus.loading, isLive: false));
 
     final result = await _repository.getCoins();
     switch (result) {
@@ -43,10 +43,12 @@ class MarketBloc extends Bloc<MarketEvent, MarketState> {
         Success(:final value) => state.copyWith(
           status: MarketStatus.loaded,
           coins: _applyUpdates(state.coins, value),
+          isLive: true,
         ),
         Failure(:final failure) => state.copyWith(
           status: MarketStatus.error,
           failure: failure,
+          isLive: false,
         ),
       },
     );

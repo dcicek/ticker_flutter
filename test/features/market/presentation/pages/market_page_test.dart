@@ -82,6 +82,21 @@ void main() {
       verify(() => bloc.add(const MarketStarted())).called(1);
     });
 
+    testWidgets('canlı değilken gösterge "Bağlantı yok" der', (tester) async {
+      await pumpPage(tester, const MarketState(status: MarketStatus.loaded));
+
+      expect(find.byTooltip('Bağlantı yok'), findsOneWidget);
+    });
+
+    testWidgets('canlıyken gösterge "Canlı" der', (tester) async {
+      await pumpPage(
+        tester,
+        const MarketState(status: MarketStatus.loaded, isLive: true),
+      );
+
+      expect(find.byTooltip('Canlı'), findsOneWidget);
+    });
+
     testWidgets('canlı güncelleme gelince yalnızca değişen fiyat ve yüzde '
         'yeniden kurulur', (tester) async {
       const btc = Coin(
